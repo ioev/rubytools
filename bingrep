@@ -1,0 +1,44 @@
+#!/usr/bin/ruby
+
+pattern = ARGV[0]
+files = ARGV[1..]
+
+if ARGV.length < 2
+  puts "Usage: bingrep [pattern] [path]"
+  exit
+end
+
+puts "Searching for #{pattern} in #{files.join(', ')}:"
+
+def string_to_pattern(string)
+  string.gsub(/[0-9a-f]{2}/i) { |match| Regexp.escape(match.to_i(16).chr) }
+end
+
+def bin_to_hex(data)
+  data.each_byte.map { |b| b.to_s(16).rjust(2, '0') }.join.upcase
+end
+
+def search(file, pattern)
+  content = IO.binread(file)
+
+  index = 0
+  while found = content.index(pattern, index) do
+    match = bin_to_hex(content.match(pattern, index)[0])
+    puts "#{file}: #{(found).to_s(16).rjust(8, '0').upcase}: #{match}"
+    index = found + 1
+  end
+end
+
+def search_path(file, pattern)
+  if Dir.exists?(file)
+    (Dir.entries(file) - %w(. ..)).each { |path| search_path(File.join(file, path), pattern) }
+  else
+    search(file, pattern)
+  end
+end
+
+pattern = string_to_pattern(pattern)
+
+files.each do |file|
+  search_path(file, /#{pattern}/m)
+end

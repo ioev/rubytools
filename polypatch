@@ -1,0 +1,55 @@
+#!/usr/bin/ruby
+
+def print_usage
+  puts "Usage: polypatch [patchname] [path]"
+end
+
+if ARGV.length < 2
+  print_usage
+  exit
+end
+
+patchfile, path = ARGV
+
+
+if !File.exists?(patchfile)
+  puts "Patchfile \"#{patch}\" does not exist\n"
+  print_usage
+  exit
+end
+
+puts "Patching..."
+
+def string_to_bin(string)
+  string.gsub(/[0-9a-f]{2}/i) { |match| match.to_i(16).chr }
+end
+
+patchstring = patch = nil
+
+File.open(patchfile).each do |line|
+  line = line.strip
+  next if line.empty? || line.start_with?('#')
+
+  if line.start_with?('PATCH:')
+    patchstring = line.split(/:\s?/).last
+    patch = string_to_bin(patchstring)
+  else
+    path, pos = line.split(/:\s?/)
+    pos = pos.to_i(16)
+
+    if File.exists?(path)
+      size = File.size(path)
+
+      if size >= (pos + patch.length)
+        puts "Writing #{patchstring} to #{path} at pos #{pos}"
+        File.write(path, patch, pos)
+      else
+        puts "Cannot patch #{path}, size #{size} is smaller than patched end pos #{pos + patch.length}"
+      end
+    else
+      puts "Cannot find #{path}"
+    end
+  end
+end
+
+puts "Done!"
