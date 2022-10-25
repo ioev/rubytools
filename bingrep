@@ -1,17 +1,26 @@
-#!/usr/bin/ruby
+#!ruby
 
 pattern = ARGV[0]
 files = ARGV[1..]
 
 if ARGV.length < 2
   puts "Usage: bingrep [pattern] [path]"
+  puts "ex:"
+  puts "  bingrep \"string with spaces and w.ldcard\" ./"
+  puts "  bingrep \"0x004433 22.33\" ./somefile.bin  # spaces are ignored"
+  puts "  bingrep \"0x0044_33\" ./  # displayed offset will be relative to the _ position"
   exit
 end
 
-puts "Searching for #{pattern} in #{files.join(', ')}:"
+puts "Searching for \"#{pattern}\" in #{files.join(', ')}:"
 
 def string_to_pattern(string)
-  string.gsub(/[0-9a-f]{2}/i) { |match| Regexp.escape(match.to_i(16).chr) }
+  if string.start_with?('0x')
+    string = string[2..].gsub(' ', '').gsub(/[0-9a-f]{2}/i) { |match| Regexp.escape(match.to_i(16).chr) }
+    string.slice!(@offset) if @offset = string.index('_')
+  end
+
+  string
 end
 
 def bin_to_hex(data)
@@ -24,7 +33,7 @@ def search(file, pattern)
   index = 0
   while found = content.index(pattern, index) do
     match = bin_to_hex(content.match(pattern, index)[0])
-    puts "#{file}: #{(found).to_s(16).rjust(8, '0').upcase}: #{match}"
+    puts "#{file}: #{(found + (@offset ? @offset - 1 : 0)).to_s(16).rjust(8, '0').upcase}: #{match}"
     index = found + 1
   end
 end
