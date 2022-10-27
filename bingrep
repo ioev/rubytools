@@ -17,7 +17,12 @@ puts "Searching for \"#{pattern}\" in #{files.join(', ')}:"
 def string_to_pattern(string)
   if string.start_with?('0x')
     string = string[2..].gsub(' ', '').gsub(/[0-9a-f]{2}/i) { |match| Regexp.escape(match.to_i(16).chr) }
-    string.slice!(@offset) if @offset = string.index('_')
+
+    if offset = string.index('_')
+      # use 2 catching groups to figure out where the _ exists in the located strings
+      @offset_regex = string.split('_').map { |p| "(#{p})" }.join
+      string.slice!(offset)
+    end
   end
 
   string
@@ -32,8 +37,11 @@ def search(file, pattern)
 
   index = 0
   while found = content.index(pattern, index) do
-    match = bin_to_hex(content.match(pattern, index)[0])
-    puts "#{file}: #{(found + (@offset ? @offset - 1 : 0)).to_s(16).rjust(8, '0').upcase}: #{match}"
+    bin_match = content.match(pattern, index)[0];
+    match = bin_to_hex(bin_match)
+    offset = @offset_regex ? bin_match.match(@offset_regex)[1].length : 0
+
+    puts "#{file}: #{(found + offset).to_s(16).rjust(8, '0').upcase}: #{offset > 0 ? match.insert(offset * 2, '_') : match}"
     index = found + 1
   end
 end
