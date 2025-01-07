@@ -4,7 +4,7 @@ pattern = ARGV[0]
 files = ARGV[1..]
 
 if ARGV.length < 2
-  puts "Usage: bingrep [pattern] [path]"
+  puts "Usage: bingrep [pattern/-i(interactive)] [path]"
   puts "ex:"
   puts "  bingrep \"string with spaces and w.ldcard\" ./"
   puts "  bingrep \"0x004433 22.33\" ./somefile.bin  # spaces are ignored"
@@ -12,15 +12,16 @@ if ARGV.length < 2
   exit
 end
 
-puts "Searching for \"#{pattern}\" in #{files.join(', ')}:"
-
 def string_to_pattern(string)
   if string.start_with?('0x')
     string = string[2..].gsub(' ', '').gsub(/[0-9a-f]{2}/i) { |match| Regexp.escape(match.to_i(16).chr) }
 
     if offset = string.index('_')
-      # use 2 catching groups to figure out where the _ exists in the located strings
-      @offset_regex = string.split('_').map { |p| "(#{p})" }.join
+      if offset > 0
+        # use 2 catching groups to figure out where the _ exists in the located strings
+        @offset_regex = string.split('_').tap { |one, _| break /^(#{one})/m }
+      end
+
       string.slice!(offset)
     end
   end
@@ -38,24 +39,47 @@ def search(file, pattern)
   index = 0
   while found = content.index(pattern, index) do
     bin_match = content.match(pattern, index)[0];
-    match = bin_to_hex(bin_match)
-    offset = @offset_regex ? bin_match.match(@offset_regex)[1].length : 0
 
-    puts "#{file}: #{(found + offset).to_s(16).rjust(8, '0').upcase}: #{offset > 0 ? match.insert(offset * 2, '_') : match}"
+    offset = @offset_regex ? bin_match.match(@offset_regex)[1].length : 0
+    match = bin_to_hex(bin_match)
+    match = offset > 0 ? match.insert(offset * 2, '_') : match
+
+    puts "#{file}: #{(found + offset).to_s(16).rjust(8, '0').upcase}: #{match}"
     index = found + 1
   end
 end
 
 def search_path(file, pattern)
-  if Dir.exists?(file)
+  if Dir.exist?(file)
     (Dir.entries(file) - %w(. ..)).each { |path| search_path(File.join(file, path), pattern) }
   else
     search(file, pattern)
   end
 end
 
-pattern = string_to_pattern(pattern)
+def do_search(pattern, files)
+  puts "Searching for \"#{pattern}\" in #{files.join(', ')}:"
 
-files.each do |file|
-  search_path(file, /#{pattern}/m)
+  pattern = string_to_pattern(pattern)
+
+  files.each do |file|
+    search_path(file, /#{pattern}/m)
+  end
+end
+
+if pattern == '-i'
+  puts "Interactive mode, type \"exit\" to quit."
+
+  require 'tty-prompt'
+  prompt = TTY::Prompt.new
+
+  loop do
+    input = prompt.ask("?")
+    break if input&.chomp == 'exit'
+    do_search(input, files) if input
+  end
+
+  exit
+else
+  do_search(pattern, files)
 end
