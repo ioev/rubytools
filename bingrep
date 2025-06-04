@@ -1,4 +1,4 @@
-#!ruby
+#!/usr/bin/env ruby
 
 pattern = ARGV[0]
 files = ARGV[1..]

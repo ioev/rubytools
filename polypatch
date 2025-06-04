@@ -1,4 +1,4 @@
-#!/home/jperry/.asdf/shims/ruby
+#!/usr/bin/env ruby
 
 require File.join(File.dirname(__FILE__), 'polypatch')
 
